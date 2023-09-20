@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, useMap, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./App.css";
-
-// IMAGE IMPORTS
 import arrow from "./images/icon-arrow.svg";
 import marker from "./images/icon-location.svg";
+
+let api_key = process.env.REACT_APP_API_KEY;
 
 let L = window.L;
 let icon = L.icon({
@@ -23,12 +23,15 @@ let mapTiles = L.tileLayer(
 
 function App() {
   const [userInput, setUserInput] = useState("");
+
   const [lat, setLat] = useState("");
   const [long, setLong] = useState("");
   const [isp, setIsp] = useState("");
   const [city, setCity] = useState("");
   const [ip, setIP] = useState("");
   const [timeZone, setTimeZone] = useState("");
+
+
 
   function MapComponent(props) {
     const map = useMap();
@@ -42,22 +45,51 @@ function App() {
       .then((response) => response.json())
       .then((data) => {
         setIP(data.ip);
-        getLocationInfo(data.ip);
+        getLocationInfo_IP(data.ip);
       });
   }
 
   // SUBSEQUENT INFO IS THEN PULLED FROM ANOTHER API BASED ON THE IP INFO
-  async function getLocationInfo(ip) {
-    await fetch(`http://ip-api.com/json/${ip}`)
+  async function getLocationInfo_IP(input) {
+    try{
+      await fetch(`https://geo.ipify.org/api/v2/country,city?apiKey=${api_key}&ipAddress=${userInput}`)
       .then((response) => response.json())
       .then((data) => {
-        setIP(data.query);
-        setLat(data.lat);
-        setLong(data.lon);
+        setIP(data.ip);
+        setLat(data.location.lat);
+        setLong(data.location.lng);
         setIsp(data.isp);
-        setCity(data.city);
-        setTimeZone(data.timezone);
+        setCity(data.location.city);
+        setTimeZone("UTC " + data.location.timezone);
       });
+    }catch{
+      setLat(undefined);
+      setLong(undefined);
+    }
+  }
+
+  async function getLocationInfo_domain(input) {
+    try {
+      await fetch(
+        `https://geo.ipify.org/api/v2/country,city?apiKey=${api_key}&domain=${userInput}`
+      )
+        .then((response) => response.json())
+        .then((data) => {
+          setIP(data.ip);
+          setLat(data.location.lat);
+          setLong(data.location.lng);
+          setIsp(data.isp);
+          setCity(data.location.city);
+          setTimeZone("UTC " + data.location.timezone);
+        });
+    } catch {
+      setLat(undefined);
+      setLong(undefined);
+      setIP("");
+      setIsp("");
+      setCity("");
+      setTimeZone("");
+    }
   }
 
   useEffect(() => {
@@ -67,7 +99,6 @@ function App() {
   // INPUT HANDLERS
   function clickHandler() {
     setUserInput("");
-    setIP("");
   }
 
   function inputHandler(e) {
@@ -78,10 +109,40 @@ function App() {
   function buttonHandler(event) {
     event.preventDefault();
     if (userInput.includes(".")) {
-      getLocationInfo(userInput);
+      getLocationInfo_IP(userInput);
     } else {
       setLat(undefined);
       setLong(undefined);
+      setIP("");
+      setIsp("");
+      setCity("");
+      setTimeZone("");
+    }
+  }
+
+    
+  function validateInput(event) {
+    event.preventDefault();
+    if (
+      /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
+        userInput
+      )
+    ) {
+      getLocationInfo_IP(userInput);
+      console.log("correct IP Address");
+    } else if (
+      /^(?!-)[A-Za-z0-9-]+([\-\.]{1}[a-z0-9]+)*\.[A-Za-z]{2,6}$/.test(userInput)
+    ) {
+      getLocationInfo_domain(userInput);
+      console.log("correct domain");
+    } else {
+      setLat(undefined);
+      setLong(undefined);
+      setIP("");
+      setIsp("");
+      setCity("");
+      setTimeZone("");
+      console.log("Incorrect Info, try again");
     }
   }
 
@@ -95,12 +156,13 @@ function App() {
               value={userInput}
               id="input-box"
               onChange={(e) => inputHandler(e)}
+              onClick={() => clickHandler()}
               type="text"
               placeholder="Search for any IP address or domain"
               autocomplete="off"
             />
-            <button onClick={(e) => buttonHandler(e, ip)}>
-              <img src={arrow}></img>
+            <button onClick={(e) => validateInput(e)}>
+              <img src={arrow} alt="arrow-icon"></img>
             </button>
           </div>
         </form>
